@@ -7,7 +7,6 @@ import numpy as np
 
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
 plt.rcParams['axes.unicode_minus'] = False
-plt.rcParams['figure.max_open_warning'] = False
 
 # 参数设置
 total_0 = 50000                                     # 初始总本金
@@ -248,7 +247,7 @@ def batch_backtest(index, index_name, start, end, tolerance, trend):
     plt.title(f"{index_name} {start}——{end} 总资产")
     plt.legend()
     plt.grid()
-    plt.show(block=False)
+    plt.show()
     plt.pause(0.01)
 
     ## 持仓市值可视化
@@ -260,7 +259,7 @@ def batch_backtest(index, index_name, start, end, tolerance, trend):
     plt.title(f"{index_name} {start}——{end} 持仓市值")
     plt.legend()
     plt.grid()
-    plt.show(block=False)
+    plt.show()
     plt.pause(0.01)
 
     print(f"{index_name} {start}——{end} 回测完成")
@@ -293,7 +292,7 @@ for metric in kde_metrics:
         plt.title(f"{metric} KDE分布 | {env}")
         plt.legend()
         plt.grid()
-        plt.show(block=False)
+        plt.show()
         plt.pause(0.01)
 
 # 输出回测指标汇总表
