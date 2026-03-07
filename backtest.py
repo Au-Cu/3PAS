@@ -152,14 +152,18 @@ def win_rate(series):
 def batch_backtest(index, index_name, start, end, tolerance, trend):
 
     ## 数组元素为面板数据
-    s_total = []  # 本策略总资产
-    s_market = [] # 本策略市值
+    strat_total = []    # 本策略总资产
+    strat_market = []   # 本策略市值
+    strat_position = [] # 本策略仓位
 
     ## 数组元素为时间序列
-    cons_total = []   # 保守基准总资产面板
-    conmarket = []    # 保守基准市值面板
-    aggr_total = []   # 激进基准总资产面板
-    aggr_market = []  # 激进基准市值面板
+    cons_total = []    # 保守基准总资产面板
+    cons_market = []   # 保守基准市值面板
+    cons_position = [] # 保守基准仓位面板
+
+    aggr_total = []    # 激进基准总资产面板
+    aggr_market = []   # 激进基准市值面板
+    aggr_position = [] # 激进基准仓位面板
 
     # 数组元素为四元组
     strat_metrics = [] # 策略表现统计指标
@@ -173,8 +177,9 @@ def batch_backtest(index, index_name, start, end, tolerance, trend):
     ## 对不同的相对亏损容忍度参数分别进行回测
     for i, tol in enumerate(tols):
 
-        s_total.append([])  # 单个相对亏损容忍度下本策略总资产面板数据，数组元素为时间序列
-        s_market.append([]) # 单个相对亏损容忍度下本策略市值面板数据，数组元素为时间序列
+        strat_total.append([])    # 单个相对亏损容忍度下本策略总资产面板数据，数组元素为时间序列
+        strat_market.append([])   # 单个相对亏损容忍度下本策略市值面板数据，数组元素为时间序列
+        strat_position.append([]) # 单个相对亏损容忍度下本策略仓位面板数据，数组元素为时间序列
         
         ### 对所有的成分股分别进行回测
         for stock in tqdm(index, desc=index_name):
@@ -184,13 +189,13 @@ def batch_backtest(index, index_name, start, end, tolerance, trend):
             if df is None:
                 continue
 
-            s_total[i].append(total)
-            s_market[i].append(market)
+            strat_total[i].append(total)
+            strat_market[i].append(market)
 
             #### 保守基准策略：只投容忍亏损本金
             c_total, c_market = benchmark(df, total_0 - protected, protected)
             cons_total.append(c_total)
-            conmarket.append(c_market)
+            cons_market.append(c_market)
 
             #### 激进基准策略：本金all in
             a_total, a_market = benchmark(df, total_0, 0)
@@ -217,30 +222,35 @@ def batch_backtest(index, index_name, start, end, tolerance, trend):
                                       win_rate(a_total)])
                 
     ## 按时间对齐后取均值
-        s_total[i] = pd.concat(s_total[i], axis=1).mean(axis=1)
-        s_market[i] = pd.concat(s_market[i], axis=1).mean(axis=1)
-
+        strat_total[i] = pd.concat(strat_total[i], axis=1).mean(axis=1)
+        strat_market[i] = pd.concat(strat_market[i], axis=1).mean(axis=1)
+        strat_position[i] = np.array(strat_market[i]) / np.array(strat_total[i])
+        
     cons_total = pd.concat(cons_total, axis=1).mean(axis=1)
-    conmarket = pd.concat(conmarket, axis=1).mean(axis=1)
+    cons_market = pd.concat(cons_market, axis=1).mean(axis=1)
 
     aggr_total = pd.concat(aggr_total, axis=1).mean(axis=1)
     aggr_market = pd.concat(aggr_market, axis=1).mean(axis=1)
    
+    ## 计算基准仓位
+    cons_position = np.array(cons_market) / np.array(cons_total)
+    aggr_position = np.array(aggr_market) / np.array(aggr_total)
+
     strat_metrics = np.array(strat_metrics)
     bench_metrics = np.array(bench_metrics)
 
     # 统计指标汇总
     summary.append([trend,
-                         index_name,
-                         np.nanmean(strat_metrics[:,0]),
-                         np.nanmean(bench_metrics[:,1]),
-                         np.nanmean(strat_metrics[:,1]),
-                         np.nanmean(bench_metrics[:,2]),
-                         np.nanmean(strat_metrics[:,2])])
+                    index_name,
+                    np.nanmean(strat_metrics[:,0]),
+                    np.nanmean(bench_metrics[:,1]),
+                    np.nanmean(strat_metrics[:,1]),
+                    np.nanmean(bench_metrics[:,2]),
+                    np.nanmean(strat_metrics[:,2])])
 
     ## 总资产变化可视化
     plt.figure(figsize=(12,6))
-    for i, lst in enumerate(s_total):
+    for i, lst in enumerate(strat_total):
         plt.plot(lst, label=f"本策略(tolerance={tols[i]}%)", alpha=0.5)
     plt.plot(cons_total, label="保守基准")
     plt.plot(aggr_total, label="激进基准")
@@ -248,19 +258,17 @@ def batch_backtest(index, index_name, start, end, tolerance, trend):
     plt.legend()
     plt.grid()
     plt.show()
-    plt.pause(0.01)
 
-    ## 持仓市值可视化
+    ## 仓位可视化
     plt.figure(figsize=(12,6))
-    for i, lst in enumerate(s_market):
-        plt.plot(lst, label=f"本策略(tolerance={tols[i]}%)", alpha=0.5)
-    plt.plot(conmarket, label="保守基准")
-    plt.plot(aggr_market, label="激进基准")
-    plt.title(f"{index_name} {start}——{end} 持仓市值")
+    for i, array in enumerate(strat_position):
+        plt.plot(array, label=f"本策略(tolerance={tols[i]}%)", alpha=0.5)
+    plt.plot(cons_position, label="保守基准")
+    plt.plot(aggr_position, label="激进基准")
+    plt.title(f"{index_name} {start}——{end} 仓位")
     plt.legend()
     plt.grid()
     plt.show()
-    plt.pause(0.01)
 
     print(f"{index_name} {start}——{end} 回测完成")
 
@@ -293,7 +301,6 @@ for metric in kde_metrics:
         plt.legend()
         plt.grid()
         plt.show()
-        plt.pause(0.01)
 
 # 输出回测指标汇总表
 table = pd.DataFrame(summary, columns=['市场环境',
